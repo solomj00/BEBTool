@@ -2,141 +2,72 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>BEB Global Dispatcher</title>
+    <title>BEB Master Dispatcher - 34 Runs</title>
     <style>
-        :root { --bg: #f8f9fa; --card: #ffffff; --primary: #004a99; --accent: #00d4ff; --text: #2d3436; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text); }
+        :root { --primary: #004a99; --success: #27ae60; --warning: #f39c12; --danger: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); }
         
-        /* Layout Sections */
-        #fleet-column { width: 35%; border-right: 2px solid #dfe6e9; padding: 20px; overflow-y: auto; background: var(--card); }
-        #work-column { width: 65%; padding: 20px; overflow-y: auto; }
-
-        .bus-slot { border: 1px solid #dfe6e9; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: 0.2s; position: relative; }
-        .bus-slot:hover { border-color: var(--accent); background: #f1f9ff; }
-        .bus-slot.selected { border: 2px solid var(--primary); background: #eef2f7; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        /* Left Column: Fleet Status */
+        #fleet-col { width: 30%; border-right: 2px solid #ddd; padding: 20px; overflow-y: auto; background: white; }
         
-        .badge { font-size: 0.75em; padding: 3px 8px; border-radius: 12px; font-weight: bold; margin-right: 5px; }
-        .rt71 { background: #ffeaa7; color: #d35400; }
-        .rt73 { background: #fab1a0; color: #c0392b; }
-        .soc-low { color: #d63031; font-weight: bold; }
+        /* Right Column: Work Pool */
+        #work-col { width: 70%; padding: 20px; overflow-y: auto; }
 
-        .run-card { background: var(--card); border: 1px dotted #b2bec3; border-radius: 6px; padding: 12px; margin: 5px; width: 220px; display: inline-block; vertical-align: top; font-size: 0.9em; }
-        .run-card.compatible { border: 2px solid #55efc4; background: #f7fff9; cursor: pointer; }
-        .run-card.compatible:hover { background: #55efc4; color: white; }
-        .run-card.assigned { opacity: 0.3; pointer-events: none; text-decoration: line-through; }
+        .bus-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; }
+        .bus-card:hover { border-color: var(--primary); background: #f0f7ff; }
+        .bus-card.selected { border: 2px solid var(--primary); background: #ebf4ff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        .run-item { display: inline-block; width: 180px; background: white; border: 1px solid #ccc; border-radius: 6px; padding: 10px; margin: 5px; font-size: 0.85em; vertical-align: top; }
+        .run-item.assigned { opacity: 0.2; text-decoration: line-through; background: #eee; }
+        .run-item.compatible { border: 2px solid var(--success); background: #eafff0; cursor: pointer; font-weight: bold; }
+        .run-item.compatible:hover { background: var(--success); color: white; }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        button.reset { background: #d63031; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .miles-bar { height: 8px; background: #eee; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .miles-fill { height: 100%; background: var(--success); transition: 0.3s; }
+        .miles-over { background: var(--danger) !important; }
+
+        h2 { margin-top: 0; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .badge { font-size: 0.8em; padding: 2px 6px; border-radius: 4px; color: white; margin-right: 4px; }
+        .rt71 { background: #ed8936; }
+        .rt73 { background: #48bb78; }
+        button { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div id="fleet-column">
-    <div class="header">
-        <h2>Active Fleet (12)</h2>
-        <button class="reset" onclick="resetAll()">Reset All</button>
-    </div>
-    <div id="bus-list"></div>
+<div id="fleet-col">
+    <h2>Active Fleet</h2>
+    <button onclick="resetApp()">Reset All Data</button>
+    <div id="busList"></div>
 </div>
 
-<div id="work-column">
-    <h2>Available Work Pool</h2>
-    <p id="instruction">Click a bus on the left to see compatible runs here.</p>
-    <div id="run-pool"></div>
+<div id="work-col">
+    <h2>Unassigned Runs (34 Total)</h2>
+    <p id="instruction">Select a bus on the left to see which runs it can safely perform.</p>
+    <div id="runPool"></div>
 </div>
 
 <script>
-    // All 34 provided runs parsed into JSON
-    const masterRuns = [
-        {id: 1, rt: "73", mi: 60.0, s: "426a", e: "944a", sM: 266, eM: 584},
-        {id: 2, rt: "71", mi: 84.2, s: "433a", e: "1254p", sM: 273, eM: 774},
-        {id: 3, rt: "73", mi: 87.0, s: "439a", e: "147p", sM: 279, eM: 827},
-        {id: 4, rt: "73", mi: 50.1, s: "445a", e: "916a", sM: 285, eM: 556},
-        {id: 5, rt: "71", mi: 60.2, s: "451a", e: "1011a", sM: 291, eM: 611},
-        {id: 6, rt: "73", mi: 77.1, s: "456a", e: "102p", sM: 296, eM: 782},
-        {id: 7, rt: "73", mi: 24.7, s: "502a", e: "721a", sM: 302, eM: 441},
-        {id: 8, rt: "71", mi: 84.2, s: "508a", e: "139p", sM: 308, eM: 819},
-        {id: 9, rt: "71", mi: 53.3, s: "616a", e: "1124a", sM: 376, eM: 684},
-        {id: 10, rt: "73", mi: 70.3, s: "644a", e: "217p", sM: 404, eM: 857},
-        {id: 11, rt: "71", mi: 43.3, s: "653a", e: "1023a", sM: 413, eM: 623},
-        {id: 12, rt: "73", mi: 61.0, s: "711a", e: "132p", sM: 431, eM: 812},
-        {id: 13, rt: "71", mi: 51.1, s: "720a", e: "1240p", sM: 440, eM: 760},
-        {id: 14, rt: "71", mi: 27.2, s: "1040a", e: "1255p", sM: 640, eM: 775},
-        {id: 15, rt: "71", mi: 27.1, s: "1159a", e: "209p", sM: 719, eM: 849},
-        {id: 16, rt: "71", mi: 27.2, s: "1210p", e: "226p", sM: 730, eM: 866},
-        {id: 17, rt: "71", mi: 74.1, s: "1214p", e: "857p", sM: 734, eM: 1257},
-        {id: 18, rt: "73", mi: 85.6, s: "1222p", e: "1002p", sM: 742, eM: 1322},
-        {id: 19, rt: "71", mi: 84.9, s: "1252p", e: "1016p", sM: 772, eM: 1336},
-        {id: 20, rt: "73", mi: 81.0, s: "1255p", e: "910p", sM: 775, eM: 1270},
-        {id: 21, rt: "73", mi: 60.0, s: "107p", e: "722p", sM: 787, eM: 1162},
-        {id: 22, rt: "73", mi: 79.5, s: "125p", e: "939p", sM: 805, eM: 1299},
-        {id: 23, rt: "73", mi: 77.8, s: "137p", e: "1017p", sM: 817, eM: 1337},
-        {id: 24, rt: "71", mi: 64.1, s: "143p", e: "932p", sM: 823, eM: 1292},
-        {id: 25, rt: "71", mi: 50.2, s: "224p", e: "725p", sM: 864, eM: 1165},
-        {id: 26, rt: "71", mi: 64.9, s: "236p", e: "1009p", sM: 876, eM: 1329},
-        {id: 27, rt: "73", mi: 63.4, s: "820p", e: "139x", sM: 1220, eM: 1539},
-        {id: 28, rt: "73", mi: 51.0, s: "850p", e: "138x", sM: 1250, eM: 1538},
-        {id: 29, rt: "71", mi: 50.2, s: "857p", e: "143x", sM: 1257, eM: 1543},
-        {id: 30, rt: "73", mi: 51.7, s: "920p", e: "147x", sM: 1340, eM: 1547},
-        {id: 31, rt: "71", mi: 54.1, s: "927p", e: "151x", sM: 1347, eM: 1551},
-        {id: 32, rt: "73", mi: 52.7, s: "928p", e: "133x", sM: 1348, eM: 1533},
-        {id: 33, rt: "73", mi: 41.7, s: "935p", e: "131x", sM: 1355, eM: 1531},
-        {id: 34, rt: "73", mi: 41.7, s: "935p", e: "131x", sM: 1355, eM: 1531}
-    ];
-
-    let fleet = Array.from({length: 12}, (_, i) => ({ busId: 4200 + i, assignedRuns: [], totalMi: 0 }));
-    let selectedBusIndex = null;
-
-    function render() {
-        const busList = document.getElementById('bus-list');
-        const runPool = document.getElementById('run-pool');
-        busList.innerHTML = "";
-        runPool.innerHTML = "";
-
-        fleet.forEach((bus, index) => {
-            let div = document.createElement('div');
-            div.className = `bus-slot ${selectedBusIndex === index ? 'selected' : ''}`;
-            div.onclick = () => { selectedBusIndex = index; render(); };
-            
-            let runTags = bus.assignedRuns.map(r => `<span class="badge rt${r.rt}">R${r.id}: ${r.rt}</span>`).join(" ");
-            div.innerHTML = `<strong>Bus ${bus.busId}</strong><br>${runTags || '<em>No Runs Assigned</em>'}<br><small>Total Mi: <span class="${bus.totalMi > 140 ? 'soc-low' : ''}">${bus.totalMi.toFixed(1)} / 150</span></small>`;
-            busList.appendChild(div);
-        });
-
-        if (selectedBusIndex !== null) {
-            let bus = fleet[selectedBusIndex];
-            masterRuns.forEach(run => {
-                let isAssigned = fleet.some(b => b.assignedRuns.some(r => r.id === run.id));
-                let lastRun = bus.assignedRuns[bus.assignedRuns.length - 1];
-                
-                let timeCheck = !lastRun || (run.sM - lastRun.eM >= 30);
-                let mileageCheck = (bus.totalMi + run.mi) <= 150;
-                let isCompatible = !isAssigned && timeCheck && mileageCheck;
-
-                let card = document.createElement('div');
-                card.className = `run-card ${isAssigned ? 'assigned' : ''} ${isCompatible ? 'compatible' : ''}`;
-                if (isCompatible) card.onclick = () => assignWork(run);
-                
-                card.innerHTML = `<strong>Run ${run.id} | Rt ${run.rt}</strong><br>${run.s} - ${run.e}<br>${run.mi} miles`;
-                runPool.appendChild(card);
-            });
-        }
-    }
-
-    function assignWork(run) {
-        let bus = fleet[selectedBusIndex];
-        bus.assignedRuns.push(run);
-        bus.totalMi += run.mi;
-        render();
-    }
-
-    function resetAll() {
-        fleet.forEach(b => { b.assignedRuns = []; b.totalMi = 0; });
-        selectedBusIndex = null;
-        render();
-    }
-
-    render();
-</script>
-</body>
-</html>
+    // THE FULL 34 RUN DATASET
+    const allRuns = [
+        {id: 1, rt: "73", mi: 60.025, s: "426a", e: "944a", sM: 266, eM: 584},
+        {id: 2, rt: "71", mi: 84.244, s: "433a", e: "1254p", sM: 273, eM: 774},
+        {id: 3, rt: "73", mi: 86.99, s: "439a", e: "147p", sM: 279, eM: 827},
+        {id: 4, rt: "73", mi: 50.115, s: "445a", e: "916a", sM: 285, eM: 556},
+        {id: 5, rt: "71", mi: 60.199, s: "451a", e: "1011a", sM: 291, eM: 611},
+        {id: 6, rt: "73", mi: 77.081, s: "456a", e: "102p", sM: 296, eM: 782},
+        {id: 7, rt: "73", mi: 24.71, s: "502a", e: "721a", sM: 302, eM: 441},
+        {id: 8, rt: "71", mi: 84.244, s: "508a", e: "139p", sM: 308, eM: 819},
+        {id: 9, rt: "71", mi: 53.324, s: "616a", e: "1124a", sM: 376, eM: 684},
+        {id: 10, rt: "73", mi: 70.278, s: "644a", e: "217p", sM: 404, eM: 857},
+        {id: 11, rt: "71", mi: 43.279, s: "653a", e: "1023a", sM: 413, eM: 623},
+        {id: 12, rt: "73", mi: 61.033, s: "711a", e: "132p", sM: 431, eM: 812},
+        {id: 13, rt: "71", mi: 51.09, s: "720a", e: "1240p", sM: 440, eM: 760},
+        {id: 14, rt: "71", mi: 27.191, s: "1040a", e: "1255p", sM: 640, eM: 775},
+        {id: 15, rt: "71", mi: 27.129, s: "1159a", e: "209p", sM: 719, eM: 849},
+        {id: 16, rt: "71", mi: 27.191, s: "1210p", e: "226p", sM: 730, eM: 866},
+        {id: 17, rt: "71", mi: 74.129, s: "1214p", e: "857p", sM: 734, eM: 1257},
+        {id: 18, rt: "73", mi: 85.588, s: "1222p", e: "1002p", sM: 742, eM: 1322},
+        {id: 19, rt: "71", mi: 84.881, s: "1252p", e: "1016p", sM: 772, eM: 1336},
+        {id: 20, rt: "73", mi: 81.038, s: "1255p", e: "910p", sM: 775, eM: 1270},
+        {id: 21, rt: "73", mi: 60.025, s: "107p", e: "722p", sM: 787, eM:
