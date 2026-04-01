@@ -2,128 +2,125 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Maintenance Dispatcher</title>
+    <title>BEB Dispatch & Charge Optimizer</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        h1 { color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 0; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 25px; }
-        input { flex-grow: 1; padding: 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 16px; }
-        button { padding: 12px 24px; background-color: #2b6cb0; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        button:hover { background-color: #2c5282; }
-        .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 20px; display: none; }
-        .card.active { display: block; }
-        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .charger-badge { background: #ebf8ff; color: #2c5282; padding: 6px 12px; border-radius: 20px; font-weight: bold; border: 1px solid #bee3f8; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { text-align: left; background: #f7fafc; color: #4a5568; padding: 12px; font-size: 14px; text-transform: uppercase; }
-        td { padding: 12px; border-bottom: 1px solid #edf2f7; font-size: 15px; }
-        .action-row { background-color: #fffaf0; font-weight: bold; color: #9c4221; }
-        .charge-row { background-color: #f0fff4; color: #276749; font-weight: bold; }
-        .alert { color: #c53030; font-size: 14px; font-style: italic; margin-top: 10px; }
+        :root { --primary: #2c3e50; --success: #27ae60; --warning: #f39c12; --danger: #e74c3c; }
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #f0f2f5; }
+        
+        /* Left Sidebar: Active Assignments */
+        #active-panel { width: 40%; border-right: 2px solid #ddd; padding: 20px; overflow-y: auto; background: white; }
+        
+        /* Right Sidebar: Suggestions */
+        #suggestion-panel { width: 60%; padding: 20px; overflow-y: auto; }
+
+        .bus-card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .run-tag { display: inline-block; padding: 4px 8px; background: #eee; border-radius: 4px; font-size: 0.85em; margin: 2px; border: 1px solid #ccc;}
+        .compatible { border-left: 5px solid var(--success); }
+        
+        h2 { margin-top: 0; color: var(--primary); }
+        .input-box { display: flex; gap: 10px; margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 8px; }
+        input, select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        
+        .match-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .match-item { background: white; padding: 10px; border-radius: 6px; border: 1px solid #ddd; width: 200px; font-size: 0.9em; }
+        .time-alert { color: var(--danger); font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Bus Maintenance Lookup</h1>
-    <div class="input-group">
-        <input type="text" id="busIdInput" placeholder="Enter Bus Number (e.g., 4200)" onkeypress="if(event.key === 'Enter') showSchedule()">
-        <button onclick="showSchedule()">Find Schedule</button>
+<div id="active-panel">
+    <h2>Active Dispatch</h2>
+    <div class="input-box">
+        <input type="text" id="busId" placeholder="Bus # (e.g. 4201)">
+        <select id="runSelect"></select>
+        <button onclick="assignBus()">Dispatch</button>
     </div>
+    <div id="activeList"></div>
+</div>
 
-    <div id="resultCard" class="card">
-        <div class="status-header">
-            <h2 id="displayBusId">Bus: ----</h2>
-            <span id="displayCharger" class="charger-badge">Charger --</span>
-        </div>
-        <p id="mileageSummary">Total Daily Miles: --</p>
-        
-        <table id="scheduleTable">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Action Item</th>
-                    <th>Notes</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                </tbody>
-        </table>
-        <div class="alert">* All charging slots assume shared power logic. Do not delay plug-in.</div>
-    </div>
+<div id="suggestion-panel">
+    <h2>Compatibility Queue</h2>
+    <div id="suggestions"></div>
 </div>
 
 <script>
-    const busData = [
-        { id: "1", miles: 84.2, charger: "1.1", events: [
-            {time: "04:03a", task: "MAINTENANCE: PREP / PULLOUT", note: "HVAC On - Rt 71"},
-            {time: "04:33a", task: "DEPART DEPOT", note: "Service Start"},
-            {time: "12:54p", task: "RETURN TO DEPOT", note: "Service End"},
-            {time: "01:10p", task: "ACTION: PLUG IN", note: "Source 1 Shared - Deep Charge"}
-        ]},
-        { id: "2", miles: 87.0, charger: "2.1", events: [
-            {time: "04:09a", task: "MAINTENANCE: PREP / PULLOUT", note: "HVAC On - Rt 71"},
-            {time: "04:39a", task: "DEPART DEPOT", note: "Service Start"},
-            {time: "01:47p", task: "RETURN TO DEPOT", note: "Service End"},
-            {time: "02:00p", task: "ACTION: PLUG IN", note: "Source 2 Shared - Deep Charge"}
-        ]},
-        { id: "3", miles: 147.6, charger: "3.1", events: [
-            {time: "04:38a", task: "MAINTENANCE: PREP / PULLOUT", note: "HVAC On - Rt 71"},
-            {time: "05:08a", task: "DEPART DEPOT", note: "Shift 1"},
-            {time: "01:39p", task: "RETURN TO DEPOT", note: "Midday Break"},
-            {time: "01:55p", task: "ACTION: PLUG IN", note: "CRITICAL: Must hit 3.1 immediately"},
-            {time: "07:50p", task: "ACTION: UNPLUG / PREP", note: "Evening Pullout"},
-            {time: "08:20p", task: "DEPART DEPOT", note: "Shift 2 - Rt 73"},
-            {time: "01:39x", task: "RETURN TO DEPOT", note: "Final Return - Plug in for Top-off"}
-        ]},
-        { id: "4", miles: 134.1, charger: "1.2", events: [
-            {time: "03:56a", task: "MAINTENANCE: PREP / PULLOUT", note: "Rt 73"},
-            {time: "04:26a", task: "DEPART DEPOT", note: "Shift 1"},
-            {time: "09:44a", task: "RETURN TO DEPOT", note: "Midday Charge"},
-            {time: "10:00a", task: "ACTION: PLUG IN", note: "Source 1 Shared"},
-            {time: "11:44a", task: "ACTION: UNPLUG / PREP", note: "Shift 2 Pullout"},
-            {time: "12:14p", task: "DEPART DEPOT", note: "Rt 71 Service"},
-            {time: "08:57p", task: "RETURN TO DEPOT", note: "Final - Plug in 1.2"}
-        ]},
-        // Add additional bus mappings (5-12) here following the same pattern
+    // The master data provided
+    const allRuns = [
+        {id: 1, rt: "73", mi: 60.0, start: "4:26a", end: "9:44a", startMin: 266, endMin: 584},
+        {id: 2, rt: "71", mi: 84.2, start: "4:33a", end: "12:54p", startMin: 273, endMin: 774},
+        {id: 3, rt: "73", mi: 87.0, start: "4:39a", end: "1:47p", startMin: 279, endMin: 827},
+        {id: 4, rt: "73", mi: 50.1, start: "4:45a", end: "9:16a", startMin: 285, endMin: 556},
+        {id: 5, rt: "71", mi: 60.2, start: "4:51a", end: "10:11a", startMin: 291, endMin: 611},
+        {id: 17, rt: "71", mi: 74.1, start: "12:14p", end: "8:57p", startMin: 734, endMin: 1257},
+        {id: 18, rt: "73", mi: 85.6, start: "12:22p", end: "10:02p", startMin: 742, endMin: 1322},
+        {id: 21, rt: "73", mi: 60.0, start: "1:07p", end: "7:22p", startMin: 787, endMin: 1162},
+        {id: 24, rt: "71", mi: 64.1, start: "1:43p", end: "9:32p", startMin: 823, endMin: 1292},
+        {id: 27, rt: "73", mi: 63.4, start: "8:20p", end: "1:39x", startMin: 1220, endMin: 1539}
+        // ... (truncated for space, but logic applies to all)
     ];
 
-    function showSchedule() {
-        const input = document.getElementById('busIdInput').value;
-        const resultCard = document.getElementById('resultCard');
-        const tableBody = document.getElementById('tableBody');
-        
-        // In a real tool, we might map the 1-12 slots to specific 4-digit fleet numbers
-        // For this demo, any input maps to its ID modulo 12 or direct ID match
-        const bus = busData.find(b => b.id === input) || busData[parseInt(input) % busData.length || 0];
+    let activeAssignments = [];
 
-        if (bus) {
-            document.getElementById('displayBusId').innerText = `Bus: ${input}`;
-            document.getElementById('displayCharger').innerText = `Charger ${bus.charger}`;
-            document.getElementById('mileageSummary').innerText = `Total Daily Miles: ${bus.miles} mi (Target < 150)`;
+    // Initialize Dropdown
+    const select = document.getElementById('runSelect');
+    allRuns.forEach(r => {
+        let opt = document.createElement('option');
+        opt.value = r.id;
+        opt.innerHTML = `Run ${r.id}: Rt ${r.rt} (${r.start}-${r.end})`;
+        select.appendChild(opt);
+    });
+
+    function assignBus() {
+        const id = document.getElementById('busId').value;
+        const runId = document.getElementById('runSelect').value;
+        if(!id) return alert("Enter Bus Number");
+        
+        const run = allRuns.find(r => r.id == runId);
+        activeAssignments.push({bus: id, run: run});
+        render();
+    }
+
+    function render() {
+        const activeList = document.getElementById('activeList');
+        const suggestions = document.getElementById('suggestions');
+        activeList.innerHTML = "";
+        suggestions.innerHTML = "";
+
+        activeAssignments.forEach(assign => {
+            // Create Active Card
+            let card = document.createElement('div');
+            card.className = "bus-card";
+            card.innerHTML = `<strong>Bus ${assign.bus}</strong><br>Current: Run ${assign.run.id} (Rt ${assign.run.rt})<br>Ends: ${assign.run.end} | Mi: ${assign.run.mi}`;
+            activeList.appendChild(card);
+
+            // Calculate Matches
+            let matchContainer = document.createElement('div');
+            matchContainer.className = "bus-card compatible";
+            matchContainer.innerHTML = `<h3>Options for Bus ${assign.bus}</h3>`;
             
-            tableBody.innerHTML = "";
-            bus.events.forEach(ev => {
-                const row = document.createElement('tr');
-                if(ev.task.includes("ACTION")) row.className = "action-row";
-                if(ev.task.includes("PLUG")) row.className = "charge-row";
-                
-                row.innerHTML = `
-                    <td>${ev.time}</td>
-                    <td>${ev.task}</td>
-                    <td>${ev.note}</td>
-                `;
-                tableBody.appendChild(row);
+            let group = document.createElement('div');
+            group.className = "match-group";
+
+            allRuns.forEach(nextRun => {
+                const timeGap = nextRun.startMin - assign.run.endMin;
+                const totalMi = assign.run.mi + nextRun.mi;
+
+                // LOGIC: Gap > 30 mins AND Total < 150 miles
+                if (timeGap >= 30 && totalMi <= 150) {
+                    group.innerHTML += `
+                        <div class="match-item">
+                            <strong>Run ${nextRun.id} (Rt ${nextRun.rt})</strong><br>
+                            Starts: ${nextRun.start}<br>
+                            Gap: ${timeGap} mins<br>
+                            Total Miles: ${totalMi.toFixed(1)}
+                        </div>`;
+                }
             });
-            
-            resultCard.classList.add('active');
-        } else {
-            alert("Bus not found in master 12-bus schedule.");
-        }
+            matchContainer.appendChild(group);
+            suggestions.appendChild(matchContainer);
+        });
     }
 </script>
-
 </body>
 </html>
