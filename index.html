@@ -70,4 +70,73 @@
         {id: 18, rt: "73", mi: 85.588, s: "1222p", e: "1002p", sM: 742, eM: 1322},
         {id: 19, rt: "71", mi: 84.881, s: "1252p", e: "1016p", sM: 772, eM: 1336},
         {id: 20, rt: "73", mi: 81.038, s: "1255p", e: "910p", sM: 775, eM: 1270},
-        {id: 21, rt: "73", mi: 60.025, s: "107p", e: "722p", sM: 787, eM:
+        {id: 21, rt: "73", mi: 60.025, s: "107p", e: "722p", sM: 787, eM: 1162},
+        {id: 22, rt: "73", mi: 79.489, s: "125p", e: "939p", sM: 805, eM: 1299},
+        {id: 23, rt: "73", mi: 77.819, s: "137p", e: "1017p", sM: 817, eM: 1337},
+        {id: 24, rt: "71", mi: 64.146, s: "143p", e: "932p", sM: 823, eM: 1292},
+        {id: 25, rt: "71", mi: 50.217, s: "224p", e: "725p", sM: 864, eM: 1165},
+        {id: 26, rt: "71", mi: 64.884, s: "236p", e: "1009p", sM: 876, eM: 1329},
+        {id: 27, rt: "73", mi: 63.371, s: "820p", e: "139x", sM: 1220, eM: 1539},
+        {id: 28, rt: "73", mi: 50.968, s: "850p", e: "138x", sM: 1250, eM: 1538},
+        {id: 29, rt: "71", mi: 50.23, s: "857p", e: "143x", sM: 1257, eM: 1543},
+        {id: 30, rt: "73", mi: 51.737, s: "920p", e: "147x", sM: 1340, eM: 1547},
+        {id: 31, rt: "71", mi: 54.126, s: "927p", e: "151x", sM: 1347, eM: 1551},
+        {id: 32, rt: "73", mi: 52.703, s: "928p", e: "133x", sM: 1348, eM: 1533},
+        {id: 33, rt: "73", mi: 41.723, s: "935p", e: "131x", sM: 1355, eM: 1531},
+        {id: 34, rt: "73", mi: 41.723, s: "935p", e: "131x", sM: 1355, eM: 1531}
+    ];
+
+    let fleet = Array.from({length: 12}, (_, i) => ({ busId: 4201 + i, work: [], totalMi: 0 }));
+    let selectedIdx = null;
+
+    function render() {
+        const busList = document.getElementById('busList');
+        const runPool = document.getElementById('runPool');
+        busList.innerHTML = "";
+        runPool.innerHTML = "";
+
+        fleet.forEach((bus, i) => {
+            let card = document.createElement('div');
+            card.className = `bus-card ${selectedIdx === i ? 'selected' : ''}`;
+            card.onclick = () => { selectedIdx = i; render(); };
+            
+            let runs = bus.work.map(r => `<span class="badge rt${r.rt}">${r.rt}</span>`).join("");
+            let barWidth = (bus.totalMi / 150) * 100;
+            
+            card.innerHTML = `<strong>Bus ${bus.busId}</strong> ${runs}<br>
+                             <small>${bus.totalMi.toFixed(1)} / 150 Mi</small>
+                             <div class="miles-bar"><div class="miles-fill ${bus.totalMi > 140 ? 'miles-over' : ''}" style="width:${barWidth}%"></div></div>`;
+            busList.appendChild(card);
+        });
+
+        allRuns.forEach(run => {
+            let isAssigned = fleet.some(b => b.work.some(r => r.id === run.id));
+            let canDo = false;
+            
+            if (selectedIdx !== null && !isAssigned) {
+                let bus = fleet[selectedIdx];
+                let last = bus.work[bus.work.length - 1];
+                let timeOk = !last || (run.sM - last.eM >= 30);
+                let milesOk = (bus.totalMi + run.mi) <= 150;
+                if(timeOk && milesOk) canDo = true;
+            }
+
+            let item = document.createElement('div');
+            item.className = `run-item ${isAssigned ? 'assigned' : ''} ${canDo ? 'compatible' : ''}`;
+            if(canDo) item.onclick = () => { fleet[selectedIdx].work.push(run); fleet[selectedIdx].totalMi += run.mi; render(); };
+            
+            item.innerHTML = `<strong>Run ${run.id}</strong> (Rt ${run.rt})<br>${run.s} - ${run.e}<br>${run.mi.toFixed(1)} miles`;
+            runPool.appendChild(item);
+        });
+    }
+
+    function resetApp() {
+        fleet.forEach(b => { b.work = []; b.totalMi = 0; });
+        selectedIdx = null;
+        render();
+    }
+
+    render();
+</script>
+</body>
+</html>
